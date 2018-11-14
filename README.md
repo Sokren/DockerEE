@@ -8,4 +8,4 @@ I use workflow on Ansible Tower to deploy UCP and DTR :
 * Step 2 : Linux_DockerEEworker.yml -> Install Docker EE and prepare the prerequisite for Worker (UCP Worker)
 * Step 3 : InstallUCP.yml -> Install UCP on the Manager
 * Step 4 : JoinSwarm.yml -> Join the workers to the swarm cluster
-* Step 5 : (coming soon) -> Install DTR
+* Step 5 : InstallDTR -> Install DTR
