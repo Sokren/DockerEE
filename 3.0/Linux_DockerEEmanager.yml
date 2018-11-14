@@ -11,6 +11,7 @@
     #centos, rhel, oraclelinux, for Ubuntu and SLES see https://docs.docker.com/install/linux/docker-ee/ubuntu/#set-up-the-repository or https://docs.docker.com/install/linux/docker-ee/suse/#set-up-the-repository
     dockeros: "rhel" 
     dockerosversion: "7"
+    docker_version: "18.03"
 
 # Install Docker EE  
   tasks:
@@ -33,6 +34,9 @@
 
     - name: Add docker-ee repositories
       command: yum-config-manager --add-repo {{ dockerurl }}/{{ dockeros }}/docker-ee.repo
+
+    - name: Enable docker-ee "{{ docker_version }}" repositories
+      command: yum-config-manager --enable docker-ee-stable-{{ docker_version }}
     
     - name: Install Docker EE on "{{ ansible_hostname }}"
       yum:
