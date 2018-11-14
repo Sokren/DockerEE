@@ -1,0 +1,24 @@
+---
+# Install UCP on the Manager
+- hosts: all
+  vars:
+    ucp_user: ""
+    ucp_passwd: ""
+    ucp_url: ""
+    ucp_node: ""
+    dtr_port: ""
+    ucp_ca: ""
+    dtr_version: "2.6.0"
+
+  tasks:  
+    - name: Initialise ucp_url var
+      set_fact:
+          ucp_url: "https://{{ ucp_node }}"
+    - name: Get certificate
+      uri:
+        url: https://rhdemo1.secu.bsc/ca
+        return_content: yes
+        validate_certs: no
+      register: ucp_ca
+    - name: Install DTR
+      command: docker run -i --rm docker/dtr:{{ dtr_version }} install  --dtr-external-url {{ ucp_url }}:{{ dtr_port }} --replica-https-port {{ dtr_port }}  --ucp-node {{ ucp_node }}  --ucp-username {{ ucp_user }} --ucp-password {{ ucp_passwd }} --ucp-url {{ ucp_url }}  --ucp-ca "{{ ucp_ca.content }}"

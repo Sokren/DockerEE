@@ -1,0 +1,85 @@
+---
+# Install Docker on RHEL 7
+- hosts: all
+  vars:
+    #Find your Docker EE repo URL
+    #To install Docker EE, you will need the URL of the Docker EE repository associated with your trial or subscription:
+    #1. Go to https://store.docker.com/my-content. All of your subscriptions and trials are listed.
+    #2. Click the Setup button for Docker Enterprise Edition for Red Hat Enterprise Linux.
+    #3. Copy the URL from Copy and paste this URL to dockerurl
+    dockerurl: "" 
+    #centos, rhel, oraclelinux, for Ubuntu and SLES see https://docs.docker.com/install/linux/docker-ee/ubuntu/#set-up-the-repository or https://docs.docker.com/install/linux/docker-ee/suse/#set-up-the-repository
+    dockeros: "rhel" 
+    dockerosversion: "7"
+    docker_version: "18.09"
+
+# Install Docker EE  
+  tasks:
+#Need repos rhel-7-server-rpms & rhel-7-server-extras-rpms
+
+    - name: Install required packages "{{ ansible_hostname }}"
+      yum:
+        name: "{{ item }}"
+        state: present
+      with_items: 
+        - yum-utils
+        - device-mapper-persistent-data
+        - lvm2
+
+    - name: Add vars dockerurl to yum
+      command: sh -c 'echo {{ dockerurl }}/rhel > /etc/yum/vars/dockerurl'
+      
+    - name: Add vars dockerversion to yum
+      command: sh -c 'echo {{ dockerosversion }} > /etc/yum/vars/dockerosversion'
+
+    - name: Add docker-ee repositories
+      command: yum-config-manager --add-repo {{ dockerurl }}/{{ dockeros }}/docker-ee.repo
+
+    - name: Enable docker-ee "{{ docker_version }}" repositories
+      command: yum-config-manager --enable docker-ee-stable-{{ docker_version }}
+    
+    - name: Install Docker EE on "{{ ansible_hostname }}"
+      yum:
+        name: "docker-ee"
+        state: present
+        
+    - name: enable service docker and ensure it is not masked
+      systemd:
+        name: docker
+        enabled: yes
+        masked: no
+        
+    - name: Make sure docker is running
+      systemd: state=started name=docker
+      
+    # Open port on the firewall for UCP 3.1
+    - name: Open ports firewall
+      command: firewall-cmd --add-port="{{ item }}" --permanent
+      with_items:
+        - 179/tcp
+        - 443/tcp
+        - 2376/tcp
+        - 2377/tcp
+        - 4789/udp
+        - 6443/tcp
+        - 6444/tcp
+        - 7946/udp
+        - 7946/tcp
+        - 10250/tcp
+        - 12376/tcp
+        - 12378/tcp
+        - 12379/tcp
+        - 12380/tcp
+        - 12381/tcp
+        - 12382/tcp
+        - 12383/tcp
+        - 12384/tcp
+        - 12385/tcp
+        - 12386/tcp
+        - 12388/tcp
+    
+    - name: Restart Firewalld
+      systemd:
+        state: restarted
+        daemon_reload: yes
+        name: firewalld

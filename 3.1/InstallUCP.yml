@@ -1,0 +1,13 @@
+---
+# Install UCP on the Manager
+- hosts: all
+  vars:
+    host_addr: ""
+    pod_cidr: ""
+    ucp_user: ""
+    ucp_passwd: ""
+    ucp_version: "3.1.0"
+
+  tasks:  
+    - name: Install UCP
+      command: docker container run --rm -i --name ucp -v /var/run/docker.sock:/var/run/docker.sock docker/ucp:{{ ucp_version }} install --host-address {{ host_addr }} --pod-cidr {{ pod_cidr }} --admin-username {{ ucp_user }} --admin-password {{ ucp_passwd }}
