@@ -31,12 +31,12 @@
 
     - name: Install required packages
       yum:
-        name: "{{ item }}"
+        name:
+          - yum-utils
+          - device-mapper-persistent-data
+          - lvm2
         state: present
       with_items: 
-        - yum-utils
-        - device-mapper-persistent-data
-        - lvm2
 
     - name: Add vars dockerurl to yum
       command: sh -c 'echo {{ dockerurl }}/rhel > /etc/yum/vars/dockerurl'
