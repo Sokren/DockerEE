@@ -1,4 +1,4 @@
-# UCP
+# DockerEE
 Deploy UCP cluster with Docker EE.
 
 You need to install your VM with the Linux OS you want (actually works with RHEL 7)
