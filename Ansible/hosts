@@ -1,0 +1,21 @@
+#Install DockerEE
+[DockerEE:children] #List of Group belonging to DockerEE
+DockerManager
+DockerWorker
+
+[DockerManager] #List of Manager(s) 
+Manager1
+
+[DockerWorker:children] #List of Group belonging to DockerWorker
+Swarm
+Kubernetes
+Mixed
+
+[Swarm] #List of Swarm Worker(s)
+Worker1
+
+[Kubernetes] #List of Kubernetes Worker(s)
+Worker2
+
+[Mixed] #List of Mixed Worker(s)
+Worker3

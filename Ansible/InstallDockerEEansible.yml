@@ -1,0 +1,178 @@
+---
+# Install Docker on RHEL 7
+- hosts: DockerEE
+  vars:
+    #Find your Docker EE repo URL
+    #To install Docker EE, you will need the URL of the Docker EE repository associated with your trial or subscription:
+    #1. Go to https://store.docker.com/my-content. All of your subscriptions and trials are listed.
+    #2. Click the Setup button for Docker Enterprise Edition for Red Hat Enterprise Linux.
+    #3. Copy the URL from Copy and paste this URL to dockerurl
+    dockerurl: "" 
+    #centos, rhel, oraclelinux, for Ubuntu and SLES see https://docs.docker.com/install/linux/docker-ee/ubuntu/#set-up-the-repository or https://docs.docker.com/install/linux/docker-ee/suse/#set-up-the-repository
+    dockeros: "rhel" 
+    dockerosversion: "7"
+    docker_version: "18.09"
+    #Vars for UCP
+    host_addr: "" #IP of your Master Manager Node
+    pod_cidr: "10.230.0.0/16" #Range of IP for K8S 
+    ucp_user: "" #User for your Admin
+    ucp_passwd: "" #Password of the Admin
+    ucp_version: "3.1.0" #UCP 3.1.0 Works only with docker 18.09, if docker 18.03 use UCP 3.0.6
+    #Vars for DTR
+    ucp_url: "" #Let it empty
+    ucp_node: "rhdemo1.secu.bsc" #FQDN of the Master Manager Node
+    dtr_port: "8443" #I change the port of the DTR because I install it on The Master Manager default "443"
+    ucp_ca: "" #Let it empty
+    dtr_version: "2.6.0" #DTR 2.6.0 works only with UCP 3.1.0, if UCP 3.0.6 use DTR 2.5.6
+  
+#Install Docker EE  
+  tasks:
+#Need repos rhel-7-server-rpms & rhel-7-server-extras-rpms
+
+    - name: Install required packages
+      yum:
+        name: "{{ item }}"
+        state: present
+      with_items: 
+        - yum-utils
+        - device-mapper-persistent-data
+        - lvm2
+
+    - name: Add vars dockerurl to yum
+      command: sh -c 'echo {{ dockerurl }}/rhel > /etc/yum/vars/dockerurl'
+      
+    - name: Add vars dockerversion to yum
+      command: sh -c 'echo {{ dockerosversion }} > /etc/yum/vars/dockerosversion'
+
+    - name: Add docker-ee repositories
+      command: yum-config-manager --add-repo {{ dockerurl }}/{{ dockeros }}/docker-ee.repo
+
+    - name: Enable docker-ee "{{ docker_version }}" repositories
+      command: yum-config-manager --enable docker-ee-stable-{{ docker_version }}
+    
+    - name: Install DockerEE
+      yum:
+        name: "docker-ee"
+        state: present
+        
+    - name: enable service docker and ensure it is not masked
+      systemd:
+        name: docker
+        enabled: yes
+        masked: no
+        
+    - name: Make sure docker is running
+      systemd: state=started name=docker
+    
+    # Open port on the firewall for UCP Workers
+    - name: Open ports firewall for Workers
+      command: firewall-cmd --add-port="{{ item }}" --permanent
+      with_items:
+        - 179/tcp
+        - 4789/udp
+        - 6444/tcp
+        - 7946/udp
+        - 7946/tcp
+        - 10250/tcp
+        - 12376/tcp
+        - 12378/tcp
+    # Open ports on the firewall for Manager UCP
+    - name: Open ports firewall for Managers
+      command: firewall-cmd --add-port="{{ item }}" --permanent
+      with_items:
+        - 443/tcp
+        - 2376/tcp
+        - 2377/tcp
+        - 6443/tcp
+        - 12379/tcp
+        - 12380/tcp
+        - 12381/tcp
+        - 12382/tcp
+        - 12383/tcp
+        - 12384/tcp
+        - 12385/tcp
+        - 12386/tcp
+      when: "'DockerManager' in group_names"
+    # Open ports on the firewall for Manager UCP 3.0.6
+    - name: Open port firewall UCP 3.0.6
+      command: firewall-cmd --add-port="12387/tcp" --permanent
+      when: ucp_version == "3.0.6" and 'DockerManager' in group_names
+    # Open ports on the firewall for Manager UCP 3.1.0
+    - name: Open port firewall UCP 3.1
+      command: firewall-cmd --add-port="12388/tcp" --permanent
+      when: ucp_version == "3.1.0" and 'DockerManager' in group_names
+
+    - name: Restart Firewalld
+      systemd:
+        state: restarted
+        daemon_reload: yes
+        name: firewalld
+    
+    #Install UCP on the principal Docker Manager
+    - name: Install UCP
+      command: docker container run --rm -i --name ucp -v /var/run/docker.sock:/var/run/docker.sock docker/ucp:{{ ucp_version }} install --host-address {{ host_addr }} --pod-cidr {{ pod_cidr }} --admin-username {{ ucp_user }} --admin-password {{ ucp_passwd }}
+      when: "host_addr in ansible_default_ipv4.address"
+
+    #Join docker node as Manager
+    - name: CMD to join swarm as Manager
+      command: docker swarm join-token -q manager
+      register: token_manager
+      delegate_to: "{{ host_addr }}"
+      when: ('DockerManager' in group_names) and (host_addr not in ansible_default_ipv4.address)
+      
+    - name: Join Swarm Cluster as Manager
+      command: docker swarm join --token {{ token_manager.stdout }} {{ host_addr }}:2377
+      when: ('DockerManager' in group_names) and (host_addr not in ansible_default_ipv4.address)
+
+    #Join docker node as Worker
+    - name: CMD to join swarm as Worker
+      command: docker swarm join-token -q worker
+      register: token_worker
+      delegate_to: "{{ host_addr }}"
+      when: "'DockerWorker' in group_names"
+      
+    - name: Join Swarm Cluster as Worker
+      command: docker swarm join --token {{ token_worker.stdout }} {{ host_addr }}:2377
+      when: "'DockerWorker' in group_names"
+
+    #Install DTR
+    - name: Initialise ucp_url var
+      set_fact:
+          ucp_url: "https://{{ ucp_node }}"
+    - name: Get certificate
+      uri:
+        url: '{{ ucp_url }}/ca'
+        return_content: yes
+        validate_certs: no
+      register: ucp_ca
+    - name: Install DTR
+      command: docker run -i --rm docker/dtr:{{ dtr_version }} install  --dtr-external-url {{ ucp_url }}:{{ dtr_port }} --replica-https-port {{ dtr_port }}  --ucp-node {{ ucp_node }}  --ucp-username {{ ucp_user }} --ucp-password {{ ucp_passwd }} --ucp-url {{ ucp_url }}  --ucp-ca "{{ ucp_ca.content }}"
+      when: ('DockerManager' in group_names) and (host_addr in ansible_default_ipv4.address)
+
+    #Set nodes by their groups swarm|kubernetes|mixed
+    - name: Add label Kubernetes on node(s)
+      command: docker node update --label-add com.docker.ucp.orchestrator.kubernetes=true {{ ansible_fqdn }}
+      delegate_to: "{{ host_addr }}"
+      when: ('Kubernetes' in group_names or 'Mixed' in group_names) and 
+            ('DockerManager' not in group_names)
+    
+    - name: Remove label Swarm on node(s)
+      command: docker node update --label-rm com.docker.ucp.orchestrator.swarm {{ ansible_fqdn }}
+      delegate_to: "{{ host_addr }}"
+      when: ('Kubernetes' in group_names) and 
+            ('DockerManager' not in group_names)
+      ignore_errors: yes
+
+    - name: Add label Swarm on node(s)
+      command: docker node update --label-add com.docker.ucp.orchestrator.swarm=true {{ ansible_fqdn }}
+      delegate_to: "{{ host_addr }}"
+      when: ('Swarm' in group_names or 'Mixed' in group_names) and 
+            ('DockerManager' not in group_names)
+    
+    # Not Required for a new installation
+    - name: Remove label Kubernetes on node(s) 
+      command: docker node update --label-rm com.docker.ucp.orchestrator.kubernetes {{ ansible_fqdn }}
+      delegate_to: "{{ host_addr }}"
+      when: ('Swarm' in group_names) and 
+            ('DockerManager' not in group_names)
+      ignore_errors: yes #Ignore the error because the node is already set as Swarm
