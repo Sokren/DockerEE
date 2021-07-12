@@ -11,5 +11,5 @@
       delegate_to: "{{ host_addr }}"
       
     - name: Join Swarm Cluster as Worker
-      command: docker swarm join --token {{ cmd_worker.stdout }} 192.168.230.201:2377
+      command: docker swarm join --token {{ cmd_worker.stdout }} X.X.X.X:2377
       
