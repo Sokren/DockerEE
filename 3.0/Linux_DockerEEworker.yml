@@ -72,4 +72,4 @@
         name: firewalld
         
 #    - name: Join Docker cluster as Worker
-#      command: docker swarm join --token SWMTKN-1-1mux9bpgfm3kgkanomipz25a3blazuqovklb81ab4ugj0h5twz-f0ofqkltnwdj1qftl8k3hrfem 192.168.230.20:2377
+#      command: docker swarm join --token SWMTKN-1-1mux9bpgfm3kgkanomipz25a3blazuqovklb81ab4ugj0h5twz-f0ofqkltnwdj1qftl8k3hrfem X.X.X.X:2377
